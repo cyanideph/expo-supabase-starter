@@ -44,7 +44,7 @@ bun --version
 cd ~/Projects  # Or your preferred directory
 
 # Copy the boilerplate
-cp -r ~/Documents/expo-supabase-starter-pro my-awesome-app
+cp -r ~/Documents/expo-supabase-starter my-awesome-app
 
 # Navigate into your new project
 cd my-awesome-app

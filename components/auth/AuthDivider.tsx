@@ -1,16 +1,19 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Divider, Text } from '@/components/ui';
 
-interface AuthDividerProps {
-  text?: string;
-}
-
-export function AuthDivider({ text = 'or' }: AuthDividerProps) {
+export function AuthDivider({ text = 'or' }: { text?: string }) {
   return (
-    <View className="flex-row items-center my-6">
-      <View className="flex-1 h-px bg-border" />
-      <Text className="px-4 text-sm text-muted-foreground">{text}</Text>
-      <View className="flex-1 h-px bg-border" />
+    <View className="my-6 flex-row items-center gap-3">
+      <View className="flex-1">
+        <Divider />
+      </View>
+      <Text variant="caption" className="uppercase tracking-wider">
+        {text}
+      </Text>
+      <View className="flex-1">
+        <Divider />
+      </View>
     </View>
   );
 }

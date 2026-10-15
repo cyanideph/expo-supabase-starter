@@ -1,6 +1,6 @@
 import { Redirect, Stack } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '@/lib/useAuth';
-import { View, Text, ActivityIndicator } from 'react-native';
 
 export default function AuthLayout() {
   const { user, loading } = useAuth();
@@ -19,8 +19,8 @@ export default function AuthLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="login" />
-      <Stack.Screen name="signup" />
+      <Stack.Screen name="sign-in" />
+      <Stack.Screen name="sign-up" />
       <Stack.Screen name="forgot-password" />
     </Stack>
   );

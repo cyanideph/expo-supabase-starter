@@ -1,4 +1,4 @@
-# 🚀 Expo Supabase Starter Pro
+# 🚀 Expo Supabase Starter
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Expo SDK](https://img.shields.io/badge/Expo-SDK%2054-000020.svg?style=flat&logo=expo)](https://expo.dev/)
@@ -85,7 +85,7 @@ Built with the most modern, battle-tested stack verified for November 2025.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/expo-supabase-starter-pro.git my-app
+git clone https://github.com/yourusername/expo-supabase-starter.git my-app
 cd my-app
 
 # 2. Install Bun (if not already installed)
@@ -445,7 +445,7 @@ This starter is built on top of amazing open-source projects:
 
 If you find this starter helpful, please consider giving it a star! It helps others discover the project.
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/expo-supabase-starter-pro&type=Date)](https://star-history.com/#yourusername/expo-supabase-starter-pro&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/expo-supabase-starter&type=Date)](https://star-history.com/#yourusername/expo-supabase-starter&Date)
 
 ---
 
@@ -477,6 +477,6 @@ If you find this starter helpful, please consider giving it a star! It helps oth
 
 **Built with ❤️ using Expo, Supabase, and NativeWind**
 
-**[⬆ Back to Top](#-expo-supabase-starter-pro)**
+**[⬆ Back to Top](#-expo-supabase-starter)**
 
 </div>

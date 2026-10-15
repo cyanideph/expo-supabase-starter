@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import { View } from 'react-native';
 import { router } from 'expo-router';
+import { supabase } from '@/lib/supabase';
+import { Button, FieldGroup, Input, Text, useToast } from '@/components/ui';
 
 interface EmailPasswordFormProps {
   mode: 'sign-in' | 'sign-up';
@@ -9,36 +10,39 @@ interface EmailPasswordFormProps {
 }
 
 export function EmailPasswordForm({ mode, onSuccess }: EmailPasswordFormProps) {
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
 
+  function validate() {
+    const next: typeof errors = {};
+    if (!email.trim()) next.email = 'Email is required';
+    else if (!/^\S+@\S+\.\S+$/.test(email.trim()))
+      next.email = 'Enter a valid email address';
+    if (!password) next.password = 'Password is required';
+    else if (mode === 'sign-up' && password.length < 8)
+      next.password = 'Use at least 8 characters';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   async function handleSubmit() {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
+    if (!validate()) return;
     setLoading(true);
-
     try {
       if (mode === 'sign-up') {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
         });
-
         if (error) throw error;
 
         if (data.user && !data.session) {
-          // Email confirmation required
-          Alert.alert(
-            'Check your email',
-            'We sent you a confirmation email. Please verify your email address to continue.',
-            [{ text: 'OK', onPress: () => router.replace('/(auth)/sign-in') }]
-          );
+          toast.success('Check your email to confirm your account');
+          router.replace('/(auth)/sign-in');
         } else {
-          // Auto sign-in successful
           onSuccess?.();
           router.replace('/(tabs)');
         }
@@ -47,83 +51,68 @@ export function EmailPasswordForm({ mode, onSuccess }: EmailPasswordFormProps) {
           email: email.trim(),
           password,
         });
-
         if (error) throw error;
-
         onSuccess?.();
         router.replace('/(tabs)');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'An error occurred');
+      toast.error(error.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View className="space-y-4">
-      {/* Email Input */}
-      <View>
-        <Text className="mb-2 text-sm font-medium text-foreground">Email</Text>
-        <TextInput
-          className="px-4 py-3 bg-secondary border border-border rounded-lg text-foreground"
-          placeholder="you@example.com"
-          placeholderTextColor="hsl(var(--muted-foreground))"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          editable={!loading}
-        />
-      </View>
+    <FieldGroup>
+      <Input
+        label="Email"
+        placeholder="you@example.com"
+        value={email}
+        onChangeText={(t) => {
+          setEmail(t);
+          if (errors.email) setErrors((e) => ({ ...e, email: undefined }));
+        }}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
+        autoComplete="email"
+        error={errors.email}
+        editable={!loading}
+      />
+      <Input
+        label="Password"
+        placeholder="••••••••"
+        value={password}
+        onChangeText={(t) => {
+          setPassword(t);
+          if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+        }}
+        secureTextEntry
+        autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
+        error={errors.password}
+        hint={
+          mode === 'sign-up' ? 'Must be at least 8 characters' : undefined
+        }
+        editable={!loading}
+      />
 
-      {/* Password Input */}
-      <View>
-        <Text className="mb-2 text-sm font-medium text-foreground">Password</Text>
-        <TextInput
-          className="px-4 py-3 bg-secondary border border-border rounded-lg text-foreground"
-          placeholder="••••••••"
-          placeholderTextColor="hsl(var(--muted-foreground))"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          editable={!loading}
-        />
-      </View>
-
-      {/* Forgot Password Link (Sign In only) */}
-      {mode === 'sign-in' && (
-        <TouchableOpacity
+      {mode === 'sign-in' ? (
+        <Button
+          label="Forgot password?"
+          variant="ghost"
+          size="sm"
+          fullWidth={false}
+          className="self-end"
           onPress={() => router.push('/(auth)/forgot-password')}
           disabled={loading}
-          className="self-end"
-        >
-          <Text className="text-sm text-primary">Forgot password?</Text>
-        </TouchableOpacity>
-      )}
+        />
+      ) : null}
 
-      {/* Submit Button */}
-      <TouchableOpacity
+      <Button
+        label={mode === 'sign-up' ? 'Create account' : 'Sign in'}
         onPress={handleSubmit}
-        disabled={loading}
-        className="mt-2 bg-primary rounded-lg py-3.5 px-4 active:opacity-80 disabled:opacity-50"
-      >
-        {loading ? (
-          <ActivityIndicator color="hsl(var(--primary-foreground))" />
-        ) : (
-          <Text className="text-center font-semibold text-primary-foreground">
-            {mode === 'sign-up' ? 'Create Account' : 'Sign In'}
-          </Text>
-        )}
-      </TouchableOpacity>
-
-      {/* Min requirements hint for sign up */}
-      {mode === 'sign-up' && (
-        <Text className="text-xs text-muted-foreground text-center mt-2">
-          Password must be at least 6 characters
-        </Text>
-      )}
-    </View>
+        loading={loading}
+      />
+    </FieldGroup>
   );
 }

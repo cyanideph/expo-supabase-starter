@@ -1,265 +1,222 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  StatusBar,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/useAuth';
-import { supabase } from '@/lib/supabase';
+import { useThemeStore, type ThemePreference } from '@/lib/theme';
+import { getMyProfile, updateMyProfile, type Profile } from '@/lib/api';
+import {
+  Button,
+  Card,
+  Divider,
+  ErrorState,
+  Input,
+  ListRow,
+  LoadingState,
+  Screen,
+  ScreenHeader,
+  Text,
+  useToast,
+} from '@/components/ui';
 import { Avatar } from '@/components/profile/Avatar';
 
-interface Profile {
-  username: string | null;
-  full_name: string | null;
-  avatar_url: string | null;
-  website: string | null;
-}
+const THEME_OPTIONS: { key: ThemePreference; label: string }[] = [
+  { key: 'system', label: 'System' },
+  { key: 'light', label: 'Light' },
+  { key: 'dark', label: 'Dark' },
+];
+
+const LINKS: { title: string; subtitle: string; href: string }[] = [
+  { title: 'Notifications', subtitle: 'Activity and alerts', href: '/(screens)/notifications' },
+  { title: 'Notification preferences', subtitle: 'Choose what you hear about', href: '/(screens)/notification-preferences' },
+  { title: 'Mentions', subtitle: 'Where you were @mentioned', href: '/(screens)/message-mentions' },
+  { title: 'Reactions', subtitle: 'Reactions to your activity', href: '/(screens)/message-reactions' },
+  { title: 'Replies', subtitle: 'Replies to your comments', href: '/(screens)/message-replies' },
+  { title: 'Polls', subtitle: 'Vote on community polls', href: '/(screens)/polls' },
+  { title: 'Content categories', subtitle: 'Browse by topic', href: '/(screens)/content-categories' },
+  { title: 'Featured profiles', subtitle: 'People worth following', href: '/(screens)/featured-profiles' },
+  { title: 'Favorites', subtitle: 'People you starred', href: '/(screens)/user-favorites' },
+  { title: 'Check-ins', subtitle: 'Streaks and points', href: '/(screens)/user-check-ins' },
+  { title: 'Profile visitors', subtitle: 'Who viewed you', href: '/(screens)/profile-visits' },
+  { title: 'Room invites', subtitle: 'Pending room invitations', href: '/(screens)/room-invites' },
+  { title: 'Conversation invites', subtitle: 'Pending chat invitations', href: '/(screens)/conversation-invites' },
+  { title: 'Reports', subtitle: 'Community reports', href: '/(screens)/reports' },
+  { title: 'Moderation', subtitle: 'Moderation history', href: '/(screens)/moderation-actions' },
+];
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [profile, setProfile] = useState<Profile>({
-    username: null,
-    full_name: null,
-    avatar_url: null,
-    website: null,
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const preference = useThemeStore((s) => s.preference);
+  const setPreference = useThemeStore((s) => s.setPreference);
+
+  const profileQuery = useQuery({
+    queryKey: ['profile', user?.id],
+    enabled: !!user?.id,
+    queryFn: () => getMyProfile(user!.id),
   });
 
+  const [form, setForm] = useState<Partial<Profile>>({});
   useEffect(() => {
-    if (user) {
-      getProfile();
+    if (profileQuery.data) {
+      setForm({
+        display_name: profileQuery.data.display_name ?? '',
+        username: profileQuery.data.username ?? '',
+        bio: profileQuery.data.bio ?? '',
+        status_text: profileQuery.data.status_text ?? '',
+        province: profileQuery.data.province ?? '',
+      });
     }
-  }, [user]);
+  }, [profileQuery.data]);
 
-  async function getProfile() {
-    try {
-      setLoading(true);
+  const save = useMutation({
+    mutationFn: () => updateMyProfile(user!.id, form),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+      toast.success('Profile updated');
+    },
+    onError: (e: any) => toast.error(e.message || 'Failed to update profile'),
+  });
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('username, full_name, avatar_url, website')
-        .eq('id', user!.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = no rows returned (profile doesn't exist yet)
-        throw error;
-      }
-
-      if (data) {
-        setProfile(data);
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to load profile');
-    } finally {
-      setLoading(false);
-    }
+  async function onSignOut() {
+    await signOut();
+    router.replace('/(auth)/sign-in');
   }
 
-  async function updateProfile() {
-    try {
-      setUpdating(true);
-
-      const updates = {
-        id: user!.id,
-        username: profile.username,
-        full_name: profile.full_name,
-        avatar_url: profile.avatar_url,
-        website: profile.website,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await supabase.from('profiles').upsert(updates);
-
-      if (error) throw error;
-
-      Alert.alert('Success', 'Profile updated successfully!');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
-    } finally {
-      setUpdating(false);
-    }
-  }
-
-  async function handleSignOut() {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/(auth)/sign-in');
-        },
-      },
-    ]);
-  }
-
-  async function handleDeleteAccount() {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Note: You'll need to create a Supabase Edge Function or RPC function
-              // to properly delete user accounts with RLS policies
-              Alert.alert(
-                'Not Implemented',
-                'Account deletion requires additional server-side setup. Please contact support.'
-              );
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete account');
-            }
-          },
-        },
-      ]
+  if (profileQuery.isLoading) {
+    return (
+      <Screen scroll={false}>
+        <ScreenHeader title="Profile" showBack={false} />
+        <LoadingState />
+      </Screen>
     );
   }
 
-  if (loading) {
+  if (profileQuery.isError) {
     return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="hsl(var(--primary))" />
-        </View>
-      </SafeAreaView>
+      <Screen scroll={false}>
+        <ScreenHeader title="Profile" showBack={false} />
+        <ErrorState
+          message={(profileQuery.error as any)?.message ?? 'Failed to load profile'}
+          onRetry={() => profileQuery.refetch()}
+        />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <StatusBar barStyle="dark-content" />
+    <Screen>
+      <ScreenHeader title="Profile" showBack={false} />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Header */}
-        <View className="px-6 pt-6 pb-4">
-          <Text className="text-3xl font-bold text-foreground">Profile</Text>
-          <Text className="mt-1 text-sm text-muted-foreground">
-            Manage your account settings
-          </Text>
+      <View className="items-center py-6">
+        <Avatar
+          path={profileQuery.data?.avatar_path ?? null}
+          name={form.display_name || form.username}
+          onUpload={(filePath) => {
+            updateMyProfile(user!.id, { avatar_path: filePath }).then(() => {
+              queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+            });
+          }}
+        />
+        <Text variant="subheading" className="mt-4">
+          {form.display_name || form.username || 'Your profile'}
+        </Text>
+        <Text variant="caption">{user?.email}</Text>
+      </View>
+
+      <Card className="gap-4">
+        <Input
+          label="Display name"
+          placeholder="Jane Doe"
+          value={form.display_name ?? ''}
+          onChangeText={(t) => setForm((f) => ({ ...f, display_name: t }))}
+        />
+        <Input
+          label="Username"
+          placeholder="janedoe"
+          value={form.username ?? ''}
+          onChangeText={(t) => setForm((f) => ({ ...f, username: t }))}
+          autoCapitalize="none"
+        />
+        <Input
+          label="Status"
+          placeholder="What are you up to?"
+          value={form.status_text ?? ''}
+          onChangeText={(t) => setForm((f) => ({ ...f, status_text: t }))}
+        />
+        <Input
+          label="Bio"
+          placeholder="A short introduction"
+          value={form.bio ?? ''}
+          onChangeText={(t) => setForm((f) => ({ ...f, bio: t }))}
+          multiline
+        />
+        <Input
+          label="Province"
+          placeholder="e.g. Cebu"
+          value={form.province ?? ''}
+          onChangeText={(t) => setForm((f) => ({ ...f, province: t }))}
+        />
+        <Button label="Save changes" onPress={() => save.mutate()} loading={save.isPending} />
+      </Card>
+
+      <Text variant="label" className="mb-3 mt-8">
+        Appearance
+      </Text>
+      <Card padded={false} className="p-1">
+        <View className="flex-row">
+          {THEME_OPTIONS.map((opt) => {
+            const selected = preference === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => setPreference(opt.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                className={`flex-1 items-center rounded-lg py-2.5 ${
+                  selected ? 'bg-secondary' : ''
+                }`}
+              >
+                <Text
+                  className={selected ? 'font-semibold text-foreground' : 'text-muted-foreground'}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+      </Card>
 
-        {/* Avatar Section */}
-        <View className="px-6 py-8 items-center">
-          <Avatar
-            url={profile.avatar_url}
-            size={120}
-            onUpload={(filePath) => {
-              setProfile({ ...profile, avatar_url: filePath });
-              updateProfile();
-            }}
-          />
-        </View>
-
-        {/* Profile Form */}
-        <View className="px-6 space-y-5">
-          {/* Email (Read-only) */}
-          <View>
-            <Text className="mb-2 text-sm font-medium text-foreground">Email</Text>
-            <View className="px-4 py-3 bg-secondary border border-border rounded-lg">
-              <Text className="text-foreground">{user?.email}</Text>
-            </View>
-            <Text className="mt-1.5 text-xs text-muted-foreground">
-              Email cannot be changed
-            </Text>
-          </View>
-
-          {/* Full Name */}
-          <View>
-            <Text className="mb-2 text-sm font-medium text-foreground">Full Name</Text>
-            <TextInput
-              className="px-4 py-3 bg-background border border-border rounded-lg text-foreground"
-              placeholder="John Doe"
-              placeholderTextColor="hsl(var(--muted-foreground))"
-              value={profile.full_name || ''}
-              onChangeText={(text) => setProfile({ ...profile, full_name: text })}
+      <Text variant="label" className="mb-1 mt-8">
+        More
+      </Text>
+      <Card padded={false} className="px-4">
+        {LINKS.map((link, i) => (
+          <View key={link.href}>
+            {i > 0 ? <Divider /> : null}
+            <ListRow
+              title={link.title}
+              subtitle={link.subtitle}
+              showChevron
+              onPress={() => router.push(link.href as any)}
             />
           </View>
+        ))}
+      </Card>
 
-          {/* Username */}
-          <View>
-            <Text className="mb-2 text-sm font-medium text-foreground">Username</Text>
-            <TextInput
-              className="px-4 py-3 bg-background border border-border rounded-lg text-foreground"
-              placeholder="johndoe"
-              placeholderTextColor="hsl(var(--muted-foreground))"
-              value={profile.username || ''}
-              onChangeText={(text) => setProfile({ ...profile, username: text })}
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Website */}
-          <View>
-            <Text className="mb-2 text-sm font-medium text-foreground">Website</Text>
-            <TextInput
-              className="px-4 py-3 bg-background border border-border rounded-lg text-foreground"
-              placeholder="https://example.com"
-              placeholderTextColor="hsl(var(--muted-foreground))"
-              value={profile.website || ''}
-              onChangeText={(text) => setProfile({ ...profile, website: text })}
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-          </View>
-
-          {/* Update Button */}
-          <TouchableOpacity
-            onPress={updateProfile}
-            disabled={updating}
-            className="mt-2 bg-primary rounded-lg py-3.5 px-4 active:opacity-80 disabled:opacity-50"
-          >
-            {updating ? (
-              <ActivityIndicator color="hsl(var(--primary-foreground))" />
-            ) : (
-              <Text className="text-center font-semibold text-primary-foreground">
-                Update Profile
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Divider */}
-        <View className="px-6 my-8">
-          <View className="h-px bg-border" />
-        </View>
-
-        {/* Account Actions */}
-        <View className="px-6 space-y-3">
-          {/* Sign Out Button */}
-          <TouchableOpacity
-            onPress={handleSignOut}
-            className="border border-border rounded-lg py-3.5 px-4 active:opacity-70"
-          >
-            <Text className="text-center font-semibold text-foreground">Sign Out</Text>
-          </TouchableOpacity>
-
-          {/* Delete Account Button */}
-          <TouchableOpacity
-            onPress={handleDeleteAccount}
-            className="bg-destructive/10 border border-destructive rounded-lg py-3.5 px-4 active:opacity-70"
-          >
-            <Text className="text-center font-semibold text-destructive">Delete Account</Text>
-          </TouchableOpacity>
-
-          <Text className="text-xs text-muted-foreground text-center pt-2">
-            Account deletion is permanent and cannot be undone
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <View className="mt-8 gap-3">
+        <Button label="Sign out" variant="outline" onPress={onSignOut} />
+        <Button
+          label="Delete account"
+          variant="ghost"
+          className="border border-destructive/40"
+          onPress={() =>
+            toast.info('Account deletion needs a server-side function')
+          }
+        />
+      </View>
+    </Screen>
   );
 }

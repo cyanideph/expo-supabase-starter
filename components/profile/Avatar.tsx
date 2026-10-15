@@ -1,143 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
+import { avatarUrl } from '@/lib/api';
+import { Avatar as BaseAvatar, Button, Text, useToast } from '@/components/ui';
 
-interface AvatarProps {
-  url: string | null;
+interface AvatarUploaderProps {
+  path: string | null;
+  name?: string | null;
   size?: number;
   onUpload: (filePath: string) => void;
   editable?: boolean;
 }
 
-export function Avatar({ url, size = 120, onUpload, editable = true }: AvatarProps) {
+export function Avatar({
+  path,
+  name,
+  size = 120,
+  onUpload,
+  editable = true,
+}: AvatarUploaderProps) {
+  const toast = useToast();
   const [uploading, setUploading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [localUri, setLocalUri] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (url) {
-      downloadImage(url);
-    }
-  }, [url]);
-
-  async function downloadImage(path: string) {
-    try {
-      const { data, error } = await supabase.storage
-        .from('avatars')
-        .download(path);
-
-      if (error) throw error;
-
-      const fr = new FileReader();
-      fr.readAsDataURL(data);
-      fr.onload = () => {
-        setAvatarUrl(fr.result as string);
-      };
-    } catch (error: any) {
-      console.log('Error downloading image: ', error.message);
-    }
-  }
-
-  async function uploadAvatar() {
+  async function pickAndUpload() {
     try {
       setUploading(true);
 
-      // Request media library permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission required',
-          'Please allow access to your photos to upload an avatar'
-        );
+        toast.error('Please allow photo access to upload an avatar');
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false,
         allowsEditing: true,
         quality: 0.8,
         aspect: [1, 1],
-        exif: false,
       });
-
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        return;
-      }
+      if (result.canceled || !result.assets?.length) return;
 
       const image = result.assets[0];
-
-      // Convert image to blob
       const response = await fetch(image.uri);
-      const blob = await response.blob();
-      const arrayBuffer = await new Response(blob).arrayBuffer();
+      const arrayBuffer = await response.arrayBuffer();
+      const ext = image.uri.split('.').pop()?.toLowerCase() ?? 'jpeg';
+      const filePath = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-      // Generate unique filename
-      const fileExt = image.uri?.split('.').pop()?.toLowerCase() ?? 'jpeg';
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
+      const { error } = await supabase.storage
         .from('avatars')
         .upload(filePath, arrayBuffer, {
           contentType: image.mimeType ?? 'image/jpeg',
           upsert: false,
         });
+      if (error) throw error;
 
-      if (uploadError) throw uploadError;
-
-      // Call parent callback with file path
+      setLocalUri(image.uri);
       onUpload(filePath);
-
-      // Update local state
-      setAvatarUrl(image.uri);
-
-      Alert.alert('Success', 'Avatar uploaded successfully!');
+      toast.success('Photo updated');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to upload avatar');
-      console.error('Upload error:', error);
+      toast.error(error.message || 'Failed to upload photo');
     } finally {
       setUploading(false);
     }
   }
 
   return (
-    <View className="items-center">
-      <View
-        style={{ width: size, height: size }}
-        className="rounded-full bg-secondary border-2 border-border overflow-hidden items-center justify-center"
-      >
-        {avatarUrl ? (
-          <Image
-            source={{ uri: avatarUrl }}
-            style={{ width: size, height: size }}
-            className="rounded-full"
-          />
-        ) : (
-          <View className="items-center justify-center" style={{ width: size, height: size }}>
-            <Text className="text-4xl text-muted-foreground">👤</Text>
-          </View>
-        )}
-      </View>
-
-      {editable && (
-        <TouchableOpacity
-          onPress={uploadAvatar}
+    <View className="items-center gap-3">
+      <BaseAvatar name={name} uri={localUri ?? avatarUrl(path)} size={size} />
+      {editable ? (
+        <Button
+          label={uploading ? 'Uploading…' : path ? 'Change photo' : 'Upload photo'}
+          variant="outline"
+          size="sm"
+          fullWidth={false}
+          onPress={pickAndUpload}
           disabled={uploading}
-          className="mt-3 px-4 py-2 bg-primary rounded-lg active:opacity-80 disabled:opacity-50"
-        >
-          {uploading ? (
-            <ActivityIndicator size="small" color="hsl(var(--primary-foreground))" />
-          ) : (
-            <Text className="text-sm font-medium text-primary-foreground">
-              {avatarUrl ? 'Change Photo' : 'Upload Photo'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      )}
+        />
+      ) : null}
     </View>
   );
 }

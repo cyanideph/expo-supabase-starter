@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "expo-supabase-starter-pro",
-    "slug": "expo-supabase-starter-pro",
+    "name": "expo-supabase-starter",
+    "slug": "expo-supabase-starter",
     "version": "1.0.0",
+    "scheme": "exposupabasestarter",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -30,10 +31,20 @@
     },
     "plugins": [
       "expo-router",
+      "expo-system-ui",
       [
         "expo-secure-store",
         {
           "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone."
         }
       ]
     ],

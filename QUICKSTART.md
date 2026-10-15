@@ -14,7 +14,7 @@ curl -fsSL https://bun.sh/install | bash
 
 ```bash
 # Copy boilerplate to your project
-cp -r ~/Documents/expo-supabase-starter-pro my-app
+cp -r ~/Documents/expo-supabase-starter my-app
 cd my-app
 
 # Install dependencies (30 seconds)
